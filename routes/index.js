@@ -1,12 +1,12 @@
-var express = require('express');
-var router = express.Router();
+const express = require('express');
+const router = express.Router();
 const nodemailer = require('nodemailer');
-const app = require('../app');
 const Email = require('../models/Email');
 const Account = require('../models/Account');
 const md5 = require('md5')
 const moment = require('moment');
-const { enable } = require('../app');
+const axios = require('axios').default;
+const rateLimit = require('express-rate-limit')
 
 require('dotenv/config')
 
@@ -15,8 +15,58 @@ router.get('/', function (req, res, next) {
   res.render('register');
 });
 
+
+// Check email hash and verification code + send back email
+router.get('/verify/:email/:code', async (req, res) => {
+  const { email, code } = req.params
+  console.log(email, code)
+  Email.findOne({ code: code })
+    .then(async mail => {
+      console.log(mail)
+      if (!mail) return res.status(400).send({ message: "Email not in verification process" })
+      if (new Date().toISOString() > new Date(mail.expiresAt).toISOString()) {
+        await Email.findOneAndDelete({ code: code })
+          .catch(err => console.error(err))
+        return res.status(400).send({ message: "Email verification code expired. Deleted request." }) // Email verification code expired
+      }
+
+
+      Email.findOneAndUpdate({ email: mail.email }, { status: "confirmed" })
+        .then(updatedEmail => {
+          console.log(updatedEmail)
+          res.status(200).send({ email: updatedEmail.email })
+          // res.status(200).render('verify', { email: updatedEmail.email })
+        })
+    })
+})
+
+// Final account creation
+router.post('/verify/:email/:code', async (req, res) => {
+  const { email, code } = req.params
+  const username = req.body.user
+  const password = req.body.password
+
+  console.log(req.body)
+  axios.post("https://api.playdragonfly.net/v1/authentication/register", {
+    email,
+    code,
+    username,
+    password
+  })
+
+})
+
+router.use(rateLimit({
+  windowMs: 60 * 1000, // every minute
+  max: 10,
+  message: {
+    status: 429,
+    msg: "Too many requests",
+  }
+}));
+
 // Create verification
-router.post('/', async (req, res) => {
+router.post('/register', async (req, res) => {
   const email = await req.body.email
 
   const newEmail = new Email({
@@ -37,7 +87,10 @@ router.post('/', async (req, res) => {
           if (email) {
             if (new Date().toISOString() > new Date(email.expiresAt).toISOString()) {
               Email.findOneAndDelete({ email: email })
-                .then(console.log('DELETED'))
+                .catch(err => {
+                  console.log(err)
+                  res.send(err)
+                })
             } else {
               return res.status(400).send({ emailStatus: email.status, message: "This email address has already been used to sign up" })
             }
@@ -55,66 +108,6 @@ router.post('/', async (req, res) => {
     })
 })
 
-// Check email hash and verification code + send back email
-router.get('/verify/:email/:code', async (req, res) => {
-  const { email, code } = req.params
-  console.log(email, code)
-  Email.findOne({ code: code })
-    .then(async mail => {
-      console.log(mail)
-      if (!mail) return res.status(400).render("error", { message: "Email not in verification process" }) // res.status(400).send("Email not in verification process", err)
-      if (new Date().toISOString() > new Date(mail.expiresAt).toISOString()) {
-        await Email.findOneAndDelete({ code: code })
-          .catch(err => console.error(err))
-        return res.status(400).render("error", { message: "Email verification code expired" }) // Email verification code expired
-      }
-
-
-      Email.findOneAndUpdate({ email: mail.email }, { status: "confirmed" })
-        .then(updatedEmail => {
-          console.log(updatedEmail)
-          res.status(200).render('verify', { email: updatedEmail.email })
-        })
-    })
-})
-
-// Final account creation
-router.post('/verify/:email/:code', async (req, res) => {
-  const { email, code } = req.params
-  const username = req.body.user
-  const password = req.body.password
-
-  console.log(req.body)
-
-  Email.findOne({ code: code })
-    .then(mail => {
-      console.log(mail)
-      if (!mail || md5(mail.email) !== email) return res.status(400).render("error", { message: "Email not in verification process" }) // Email not in verification process
-      if (new Date().toISOString() > new Date(mail.expiresAt).toISOString()) return res.status(400).render("error", { message: "Email verification code expired" }) // Email verification code expired
-      if (mail.status === "confirmed") {
-        const newAccount = new Account({
-          email: mail.email,
-          name: username,
-          password
-        })
-        Account.findOne({ email: mail.email }, async function (err, account) {
-          if (err) console.log(error)
-          console.log(account)
-          if (account) return res.status(400).send("An account with this email has already been created")
-          newAccount.save(async function (createdAccount) {
-            console.log(createdAccount)
-            Email.findOneAndUpdate({ email: mail.email }, { status: "account-created" }, async function (err) {
-              if (err) return res.status(500).render("error", { message: "Error while finding email" }) // res.status(500).send("Error while finding email", err)
-            })
-            res.status(201).render("success", { message: "Registration completed. Account successfully created" }) // res.status(201).send("Registration completed. Account successfully created")
-          })
-        })
-      } else if (mail.status === "account-created") {
-        console.log(mail.status)
-        res.status(400).render("error", { message: "An account with this email address has already been created" }) // res.status(400).send("An account with this email address has already been created")
-      }
-    })
-})
 
 const drgnNoreplyEmail = {
   user: process.env.DRGN_NOREPLY_EMAIL_USERNAME,
@@ -144,21 +137,21 @@ async function sendEmail(code, receiver) {
     subject: 'Account Creation', // Subject line
     text: `Please verify your account.`,
     html: `
-<!DOCTYPE html>
-<html lang="en">
+    <!DOCTYPE html>
+    <html lang="en">
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document</title>
+    </head>
 
-<body>
-    <h2>Please verify your account by clicking on the following link</h2>
-    Click http://localhost:3000/verify/${md5(receiver)}/${code}
-</body>
+    <body>
+        <h2>Please verify your account by clicking on the following link</h2>
+        Click http://localhost:5500/verify.html?r=${md5(receiver)}&c=${code}
+    </body>
 
-</html>
+    </html>
 ` // html body
   };
 
