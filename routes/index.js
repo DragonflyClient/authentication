@@ -42,7 +42,8 @@ router.get('/verify/:email/:code', async (req, res) => {
 
 // Final account creation
 router.post('/verify/:email/:code', async (req, res) => {
-  const { email, code } = req.params
+  const code = req.params
+  const email = req.body.email
   const username = req.body.user
   const password = req.body.password
 
@@ -52,16 +53,16 @@ router.post('/verify/:email/:code', async (req, res) => {
     code,
     username,
     password
-  })
+  }).then(res => console.log(res.data))
 
 })
 
 router.use(rateLimit({
   windowMs: 60 * 1000, // every minute
-  max: 10,
+  max: 7,
   message: {
     status: 429,
-    msg: "Too many requests",
+    message: "Too many requests. Please try again later.",
   }
 }));
 
@@ -92,7 +93,7 @@ router.post('/register', async (req, res) => {
                   res.send(err)
                 })
             } else {
-              return res.status(400).send({ emailStatus: email.status, message: "This email address has already been used to sign up" })
+              return res.status(400).send({ emailStatus: email.status, message: "This email address has already been used to sign up. If you think this is an error, please contact our support." })
             }
           }
 
@@ -100,8 +101,14 @@ router.post('/register', async (req, res) => {
             .then(async email => {
               console.log(email)
               console.log(email.code, "CODEE")
-              await sendEmail(email.code, email.email)
-              res.status(201).send({ message: "Successfully started verification process." })
+              try {
+                await sendEmail(email.code, email.email)
+                res.status(201).send({ message: "Successfully started verification process." })
+              } catch (error) {
+                Email.findOneAndDelete({ email: email })
+                  .catch(err => console.log(err))
+                res.status(500).send({ message: error.message })
+              }
             })
             .catch(err => console.log(err))
         })
@@ -115,28 +122,30 @@ const drgnNoreplyEmail = {
 }
 
 // Send email with nodemailer
-async function sendEmail(code, receiver) {
-  console.log(code, "CODE")
-  console.log(receiver, 'RECEIVER EMAIL')
-  // create reusable transporter object using the default SMTP transport
-  let transporter = nodemailer.createTransport({
-    pool: true,
-    host: 'cmail01.mc-host24.de',
-    port: 25,
-    secure: false, // true for 465, false for other ports
-    auth: {
-      user: drgnNoreplyEmail.user, // generated ethereal user
-      pass: drgnNoreplyEmail.password // generated ethereal password
-    }
-  });
+function sendEmail(code, receiver) {
+  return new Promise((resolve, reject) => {
 
-  // setup email data with unicode symbols
-  let mailOptions = {
-    from: `"Dragonfly" ${drgnNoreplyEmail.user}`, // sender address
-    bcc: `${receiver}`, // list of receivers
-    subject: 'Account Creation', // Subject line
-    text: `Please verify your account.`,
-    html: `
+    console.log(code, "CODE")
+    console.log(receiver, 'RECEIVER EMAIL')
+    // create reusable transporter object using the default SMTP transport
+    let transporter = nodemailer.createTransport({
+      pool: true,
+      host: 'cmail01.mc-host24.de',
+      port: 25,
+      secure: false, // true for 465, false for other ports
+      auth: {
+        user: drgnNoreplyEmail.user, // generated ethereal user
+        pass: drgnNoreplyEmail.password // generated ethereal password
+      }
+    });
+
+    // setup email data with unicode symbols
+    let mailOptions = {
+      from: `"Dragonfly" ${drgnNoreplyEmail.user}`, // sender address
+      bcc: `${receiver}`, // list of receivers
+      subject: 'Account Creation', // Subject line
+      text: `Please verify your account.`,
+      html: `
     <!DOCTYPE html>
     <html lang="en">
 
@@ -153,16 +162,20 @@ async function sendEmail(code, receiver) {
 
     </html>
 ` // html body
-  };
+    };
 
-  // send mail with defined transport object
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
-      return console.log(error);
-    }
-    console.log('EMAIL SENT')
-    console.log(moment().format('MMMM Do YYYY, h:mm:ss a') + " | " + `Message sent! Accepted Emails: ${info.accepted}, Rejected Emails: ${info.rejected}, Message time: ${info.messageTime}`);
-  });
+    // send mail with defined transport object
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.log("ERROR")
+        reject(error)
+        return
+      }
+      console.log('EMAIL SENT')
+      console.log(moment().format('MMMM Do YYYY, h:mm:ss a') + " | " + `Message sent! Accepted Emails: ${info.accepted}, Rejected Emails: ${info.rejected}, Message time: ${info.messageTime}`);
+      resolve()
+    });
+  })
 }
 
 function validateEmail(email) {
