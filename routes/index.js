@@ -15,59 +15,8 @@ router.get('/', function (req, res, next) {
   res.render('register');
 });
 
-
-// Check email hash and verification code + send back email
-router.get('/verify/:email/:code', async (req, res) => {
-  const { email, code } = req.params
-  console.log(email, code)
-  Email.findOne({ code: code })
-    .then(async mail => {
-      console.log(mail)
-      if (!mail) return res.status(400).send({ message: "Email not in verification process" })
-      if (new Date().toISOString() > new Date(mail.expiresAt).toISOString()) {
-        await Email.findOneAndDelete({ code: code })
-          .catch(err => console.error(err))
-        return res.status(400).send({ message: "Email verification code expired. Deleted request." }) // Email verification code expired
-      }
-
-
-      Email.findOneAndUpdate({ email: mail.email }, { status: "confirmed" })
-        .then(updatedEmail => {
-          console.log(updatedEmail)
-          res.status(200).send({ email: updatedEmail.email })
-          // res.status(200).render('verify', { email: updatedEmail.email })
-        })
-    })
-})
-
-// Final account creation
-router.post('/verify/:email/:code', async (req, res) => {
-  const code = req.params
-  const email = req.body.email
-  const username = req.body.user
-  const password = req.body.password
-
-  console.log(req.body)
-  axios.post("https://api.playdragonfly.net/v1/authentication/register", {
-    email,
-    code,
-    username,
-    password
-  }).then(res => console.log(res.data))
-
-})
-
-router.use(rateLimit({
-  windowMs: 60 * 1000, // every minute
-  max: 7,
-  message: {
-    status: 429,
-    message: "Too many requests. Please try again later.",
-  }
-}));
-
 // Create verification
-router.post('/register', async (req, res) => {
+router.post('/register', rateLimit({ windowMs: 60 * 1000, max: 7, message: { status: 429, message: "Too many requests. Please try again later.", } }), async (req, res) => {
   const email = await req.body.email
 
   const newEmail = new Email({
@@ -100,7 +49,6 @@ router.post('/register', async (req, res) => {
           newEmail.save()
             .then(async email => {
               console.log(email)
-              console.log(email.code, "CODEE")
               try {
                 await sendEmail(email.code, email.email)
                 res.status(201).send({ message: "Successfully started verification process." })
@@ -113,6 +61,50 @@ router.post('/register', async (req, res) => {
             .catch(err => console.log(err))
         })
     })
+})
+
+// Check email hash and verification code + send back email
+router.get('/verify/:email/:code', async (req, res) => {
+  const { email, code } = req.params
+  console.log(email, code)
+  Email.findOne({ code: code })
+    .then(async mail => {
+      console.log(mail)
+      if (!mail) return res.status(400).send({ message: "Email not in verification process" })
+      if (new Date().toISOString() > new Date(mail.expiresAt).toISOString()) {
+        await Email.findOneAndDelete({ code: code })
+          .catch(err => console.error(err))
+        return res.status(400).send({ message: "Email verification code expired. Deleted request." }) // Email verification code expired
+      }
+
+
+      Email.findOneAndUpdate({ email: mail.email }, { status: "confirmed" })
+        .then(updatedEmail => {
+          console.log(updatedEmail)
+          res.status(200).send({ email: updatedEmail.email })
+          // res.status(200).render('verify', { email: updatedEmail.email })
+        })
+    })
+})
+
+// Final account creation
+router.post('/verify/:email/:code', async (req, res) => {
+  const code = req.params
+  const email = req.body.email
+  const username = req.body.user
+  const password = req.body.password
+
+  console.log(req.body, code, email)
+  axios.post("https://api.playdragonfly.net/v1/authentication/register", {
+    email,
+    code,
+    username,
+    password
+  }).then(response => {
+    if (response.status === 200 && response.data.success)
+      res.cookie('dragonfly-token', response.data.token, { httpOnly: true, secure: true, expires: Date.now() + 1000 * 60 * 60 * 24 * 30, domain: "playdragonfly.net", path: '/', sameSite: "lax" });
+    res.send(response.data)
+  })
 })
 
 

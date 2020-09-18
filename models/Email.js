@@ -20,6 +20,6 @@ const EmailSchema = new mongoose.Schema({
     }
 })
 
-const Email = mongoose.model('Email', EmailSchema, "emails");
+const Email = mongoose.model('Email', EmailSchema, "email-verification");
 
 module.exports = Email;
