@@ -1,5 +1,4 @@
 .env
 config/keys.js
 node_modules
-views
-public
+ignore
