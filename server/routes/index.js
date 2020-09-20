@@ -244,14 +244,20 @@ function sendEmail(code, receiver, emailType) {
     let email = verifyAccount;
     let subject = subjectVerifyAccount
 
-    if (emailType === "reset") email = passwordReset; subject = subjectPasswordReset
+    if (emailType === "reset") {
+      email = passwordReset;
+      subject = subjectPasswordReset
+    } else {
+      subject = subjectVerifyAccount
+    }
+    console.log(subject + " | Subject | " + emailType + " | Email type")
 
     // setup email data with unicode symbols
     let mailOptions = {
       from: `"Dragonfly" ${drgnNoreplyEmail.user}`, // sender address
       bcc: `${receiver}`, // list of receivers
       subject: subject, // Subject line
-      text: `Please verify your account. At ${PROD_EMAIL_URL}?r=${md5(receiver)}&c=${code}`,
+      text: `Please verify your account or reset your password. At ${PROD_EMAIL_URL}?r=${md5(receiver)}&c=${code}`,
       html: email
 
       // html body
