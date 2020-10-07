@@ -255,7 +255,7 @@ function sendEmail(code, receiver, emailType) {
     // setup email data with unicode symbols
     let mailOptions = {
       from: `"Dragonfly" ${drgnNoreplyEmail.user}`, // sender address
-      bcc: `${receiver}`, // list of receivers
+      to: `${receiver}`, // list of receivers
       subject: subject, // Subject line
       text: `Please verify your account or reset your password. At ${PROD_EMAIL_URL}?r=${md5(receiver)}&c=${code}`,
       html: email
