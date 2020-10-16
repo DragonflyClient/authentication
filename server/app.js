@@ -29,7 +29,7 @@ app.use(bodyParser.urlencoded({     // to support URL-encoded bodies
   extended: true
 }));
 app.use(cors({
-  origin: ['https://playdragonfly.net'],
+  origin: ['https://playdragonfly.net', 'https://dashboard.playdragonfly.net'],
   credentials: true
 }))
 
