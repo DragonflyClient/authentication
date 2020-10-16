@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Email</title>
+    <link rel="shortcut icon" href="https://cdn.icnet.dev/web/drgn/assets/img/svg/Dragon.svg" type="image/x-icon" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Roboto+Mono&family=Rubik:ital,wght@0,400;0,700;1,300;1,400&display=swap"
+        rel="stylesheet" />
+    <style>
+        body {
+            background-color: #333333;
+            color: #ffffff;
+            padding: 20px;
+            font-family: Rubik, sans-serif;
+            font-size: 22px;
+        }
+
+        p {
+            font-size: 21px;
+        }
+
+        h2 {
+            font-weight: 500;
+            font-size: 26px;
+        }
+
+        a {
+            color: #ef852e;
+        }
+
+        .notice {
+            color: gray;
+            font-size: 1.1rem;
+        }
+
+        .privacy-link {
+            color: #ef852e !important;
+        }
+
+        .img-cont {
+            background-color: #f3f3f3;
+            margin: 0 auto;
+            width: 100%;
+            max-width: 800px;
+            border-top-left-radius: 5px;
+            border-top-right-radius: 5px;
+        }
+
+        img {
+            padding: 10px 20px;
+        }
+
+        .text-container {
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            margin: 0 auto;
+            background-color: #ffffff;
+            color: #333333;
+        }
+
+        .text-container .inner {
+            padding: 10px 20px;
+        }
+
+        .key {
+            display: inline-block;
+            background-color: #f0eeec;
+            color: #8d8a8a;
+            padding: 8px 12px;
+            font-family: "Roboto Mono", monospace;
+            font-size: 1.1rem;
+            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.25);
+        }
+
+        .cta {
+            color: #ffffff;
+            background-color: #ef852e;
+            font-size: 20px;
+            display: inline-block;
+            border-radius: 3px;
+            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.25);
+        }
+
+        .cta a {
+            color: #ffffff;
+            text-decoration: none;
+            display: block;
+            font-size: 20px;
+            padding: 8px 12px;
+        }
+
+        footer {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            color: #333333;
+            border-bottom-left-radius: 5px;
+            border-bottom-right-radius: 5px;
+            text-align: center;
+        }
+
+        footer p {
+            margin: 0;
+            margin-top: 10px;
+            color: #333333;
+        }
+
+        .f-inner {
+            padding: 20px;
+        }
+
+        .socials {
+            padding: 0;
+            margin: 0;
+        }
+
+        .socials li {
+            display: inline-block;
+            margin: 10px 15px;
+        }
+
+        footer .socials {
+            display: inline-block;
+            margin: 0 auto;
+            margin-bottom: 15px;
+        }
+
+        .socials a {
+            color: #646262;
+            font-size: 20px;
+        }
+
+        @media (max-width: 500px) {
+            p {
+                font-size: 15px;
+            }
+
+            h2 {
+                font-size: 20px;
+            }
+
+            span {
+                font-size: 15px;
+            }
+
+            .cta a {
+                font-size: 16px;
+            }
+
+            .socials li {
+                margin-bottom: 0;
+            }
+
+            .socials a {
+                color: #646262;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrapper">
+        <div class="img-cont"><img class="logo" src="https://cdn.icnet.dev/web/drgn/assets/img/svg/Dragon.png"
+                alt="logo" width="200px" /></div>
+        <div class="text-container">
+            <div class="inner">
+                <h2>You are about to change your email address.</h2>
+                <p>In order of completion, you have to verify your email
+                    address, you do this by pressing the button below.</p>
+                <p>Have fun playing,<br> Your Dragonfly team!</p>
+                <br />
+                <div class="cta"><a href="${PROD_EMAIL_URL}?r=${md5(receiver)}&c=${code}">Change it!</a></div>
+            </div>
+        </div>
+        <footer>
+            <div class="f-inner">
+                <ul class="socials">
+                    <li><a href="https://icnet.dev/insta"> Instagram </a></li>
+                    &#45;
+                    <li><a href="https://icnet.dev/twitter"> Twitter </a></li>
+                    &#45;
+                    <li><a href="https://icnet.dev/discord"> Discord </a></li>
+                </ul>
+                <p>&copy; 2020 Inception Cloud Network</p>
+            </div>
+        </footer>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.0/js/all.min.js"></script>
+</body>
+
+</html>
