@@ -1,6 +1,9 @@
 const mongoose = require('mongoose')
 
 const EmailSchema = new mongoose.Schema({
+    uuid: {
+        type: String
+    },
     email: {
         type: String,
         required: true
