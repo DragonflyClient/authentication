@@ -11,6 +11,10 @@ const possibleSuccesses = [
     {
         id: 23829,
         message: "Password successfully reset"
+    },
+    {
+        id: 78432,
+        message: "Email successfully updated"
     }
 ]
 
