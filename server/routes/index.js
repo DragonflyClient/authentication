@@ -135,11 +135,11 @@ router.post('/change', async (req, res) => {
   const email = await req.body.email
   console.log(req.cookies)
   const dragonflyToken = req.cookies['dragonfly-token']
-  const account = await getDragonflyAccount(dragonflyToken)
-  if (!account) return console.log('Error: Unauthenticated')
+  const dragonflyAccount = await getDragonflyAccount(dragonflyToken)
+  if (!dragonflyAccount) return console.log('Error: Unauthenticated')
 
   const newEmail = new Email({
-    uuid: account.uuid,
+    uuid: dragonflyAccount.uuid,
     email: email,
     code: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
     expiresAt: Date.now() + 15 * 60000
@@ -151,7 +151,7 @@ router.post('/change', async (req, res) => {
       console.log(account)
       if (account) return res.status(400).send({ message: "An account with this email address has already been created" })
 
-      Email.findOne({ email: email })
+      Email.findOne({ $or: [{ email: email }, { uuid: dragonflyAccount.uuid }] })
         .then(async email => {
           console.log(email)
           if (email) {
@@ -162,7 +162,7 @@ router.post('/change', async (req, res) => {
                   res.send(err)
                 })
             } else {
-              return res.status(400).send({ emailStatus: email.status, message: "This email address has already been used to sign up. If you think this is an error, please contact our support." })
+              return res.status(400).send({ emailStatus: email.status, message: "This email address is either in a verification process or has already been used. If you think this is an error, please contact our support." })
             }
           }
 
