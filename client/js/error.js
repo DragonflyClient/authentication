@@ -26,10 +26,6 @@ const possibleErrors = [
     {
         id: 28476,
         message: "Password reset link expired"
-    },
-    {
-        id: 48312,
-        message: "Email not in verification process"
     }
 ]
 
