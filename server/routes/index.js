@@ -13,7 +13,10 @@ const axios = require('axios').default;
 const rateLimit = require('express-rate-limit')
 const { nanoid } = require('nanoid')
 
+const mongoose = require('mongoose')
+
 const PROD_EMAIL_URL = "https://playdragonfly.net/register/verify"
+const PROD_EMAIL_CHANGE_URL = "https://playdragonfly.net/register/email/confirm"
 const PROD_PW_RESET_URL = "https://playdragonfly.net/new-password"
 
 require('dotenv/config')
@@ -128,6 +131,69 @@ router.post('/verify/:email/:code', rateLimit({ windowMs: 60 * 1000, max: 10, me
   })
 })
 
+router.post('/change', async (req, res) => {
+  const email = await req.body.email
+  console.log(req.cookies)
+  const dragonflyToken = req.cookies['dragonfly-token']
+  const account = await getDragonflyAccount(dragonflyToken)
+  if (!account) return console.log('Error: Unauthenticated')
+
+  const newEmail = new Email({
+    uuid: account.uuid,
+    email: email,
+    code: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
+    expiresAt: Date.now() + 15 * 60000
+  })
+  if (!validateEmail(email)) return res.status(400).send({ message: "Please enter a valid email address" })
+
+  Account.findOne({ email: email })
+    .then(account => {
+      console.log(account)
+      if (account) return res.status(400).send({ message: "An account with this email address has already been created" })
+
+      Email.findOne({ email: email })
+        .then(async email => {
+          console.log(email)
+          if (email) {
+            if (new Date().toISOString() > new Date(email.expiresAt).toISOString() && email.status === "pending") {
+              Email.findOneAndDelete({ email: email, status: "pending" })
+                .catch(err => {
+                  console.log(err)
+                  res.send(err)
+                })
+            } else {
+              return res.status(400).send({ emailStatus: email.status, message: "This email address has already been used to sign up. If you think this is an error, please contact our support." })
+            }
+          }
+
+          try {
+            console.log(newEmail.code, newEmail.email, "pre-send")
+            await sendEmail(newEmail.code, newEmail.email, "change")
+
+            newEmail.save()
+              .then(async email => {
+                console.log(email)
+              })
+              .catch(err => console.log(err))
+
+            res.status(201).send({ message: "Successfully started verification process. If you have not received an email within the next 10-15 minutes, please try again or contact support." })
+          } catch (error) {
+            res.status(500).send({ message: error.message })
+          }
+        })
+    })
+})
+
+router.post('/verify/change/:email/:code', async (req, res) => {
+  const { code } = req.params
+
+  const result = await Email.findOne({ code: code })
+
+  await Account.updateOne({ uuid: result.uuid }, { $set: { email: result.email } })
+  await Email.findOneAndDelete({ code: code })
+  res.send({ success: true, successId: 78432 })
+})
+
 // Send reset email
 router.post('/reset-password/:email', rateLimit({ windowMs: 60 * 1000, max: 5, message: { status: 429, message: "Too many requests. Please try again later.", } }), async (req, res) => {
   const { email } = req.params
@@ -239,6 +305,10 @@ function sendEmail(code, receiver, emailType) {
     const verifyAccount = `
     <!DOCTYPE html><html lang="en"><head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1"> <title>Email</title> <link rel="shortcut icon" href="https://cdn.icnet.dev/web/drgn/assets/img/svg/Dragon.svg" type="image/x-icon"> <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&family=Rubik:ital,wght@0,400;0,700;1,300;1,400&display=swap" rel="stylesheet"> <style>body{background-color: #333333; color: #ffffff; padding: 20px; font-family: Rubik, sans-serif; font-size: 22px;}p{font-size: 21px;}h2{font-weight: 500; font-size: 26px;}a{color: #EF852E;}.notice{color: gray; font-size: 1.1rem;}.privacy-link{color: #EF852E !important;}.img-cont{background-color: #f3f3f3; margin: 0 auto; width: 100%; max-width: 800px; border-top-left-radius: 5px; border-top-right-radius: 5px;}img{padding: 10px 20px;}.text-container{width: 100%; max-width: 800px; height: auto; margin: 0 auto; background-color: #ffffff; color: #333333;}.text-container .inner{padding: 10px 20px;}.key{display: inline-block; background-color: #f0eeec; color: #8d8a8a; padding: 8px 12px; font-family: 'Roboto Mono', monospace; font-size: 1.1rem; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.25);}.cta{color: #FFFFFF; background-color: #EF852E; font-size: 20px; display: inline-block; border-radius: 3px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.25);}.cta a{color: #ffffff; text-decoration: none; display: block; font-size: 20px; padding: 8px 12px;}footer{width: 100%; max-width: 800px; margin: 0 auto; color: #333333; border-bottom-left-radius: 5px; border-bottom-right-radius: 5px; text-align: center;}footer p{margin: 0; margin-top: 10px; color: #333333;}.f-inner{padding: 20px;}.socials{padding: 0; margin: 0;}.socials li{display: inline-block; margin: 10px 15px;}footer .socials{display: inline-block; margin: 0 auto; margin-bottom: 15px;}.socials a{color: #646262; font-size: 20px;}@media (max-width: 500px){p{font-size: 15px;}h2{font-size: 20px;}span{font-size: 15px;}.cta a{font-size: 16px;}.socials li{margin-bottom: 0;}.socials a{color: #646262; font-size: 16px;}}</style></head><body> <div class="wrapper"> <div class="img-cont"> <img class="logo" src="https://cdn.icnet.dev/web/drgn/assets/img/svg/Dragon.png" alt="logo" width="200px"> </div><div class="text-container"> <div class="inner"> <h2>Please verify your email address!</h2> <p>In order to complete the registration of your Dragonfly account, you have to verify your email address, you do this by pressing the button below.</p><p class="notice">By registering a Dragonfly Account, you accept Inception Cloud's <a class="privacy-link" href="https://inceptioncloud.net/en/privacy">privacy policy</a> and agree that your personal data will be stored indefinitely. Your data will be stored securely and will not be passed on to third parties.</p><br><div class="cta"> <a href="${PROD_EMAIL_URL}?r=${md5(receiver)}&c=${code}">Register now</a> </div></div></div><footer> <div class="f-inner"> <ul class="socials"> <li><a href="https://icnet.dev/insta"> Instagram </a></li>&#45; <li><a href="https://icnet.dev/twitter"> Twitter </a></li>&#45; <li><a href="https://icnet.dev/discord"> Discord </a></li></ul> <p>&copy; 2020 Inception Cloud Network </p></div></footer> </div><script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.0/js/all.min.js"></script></body></html>
     `
+
+    const changeEmailSubject = "Verify your email"
+    const changeEmail = `<!DOCTYPE html><html lang="en"><head> <meta charset="UTF-8"/> <meta name="viewport" content="width=device-width, initial-scale=1"/> <title>Email</title> <link rel="shortcut icon" href="https://cdn.icnet.dev/web/drgn/assets/img/svg/Dragon.svg" type="image/x-icon"/> <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&family=Rubik:ital,wght@0,400;0,700;1,300;1,400&display=swap" rel="stylesheet"/> <style>body{background-color: #333333; color: #ffffff; padding: 20px; font-family: Rubik, sans-serif; font-size: 22px;}p{font-size: 21px;}h2{font-weight: 500; font-size: 26px;}a{color: #ef852e;}.notice{color: gray; font-size: 1.1rem;}.privacy-link{color: #ef852e !important;}.img-cont{background-color: #f3f3f3; margin: 0 auto; width: 100%; max-width: 800px; border-top-left-radius: 5px; border-top-right-radius: 5px;}img{padding: 10px 20px;}.text-container{width: 100%; max-width: 800px; height: auto; margin: 0 auto; background-color: #ffffff; color: #333333;}.text-container .inner{padding: 10px 20px;}.key{display: inline-block; background-color: #f0eeec; color: #8d8a8a; padding: 8px 12px; font-family: "Roboto Mono", monospace; font-size: 1.1rem; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.25);}.cta{color: #ffffff; background-color: #ef852e; font-size: 20px; display: inline-block; border-radius: 3px; box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.25);}.cta a{color: #ffffff; text-decoration: none; display: block; font-size: 20px; padding: 8px 12px;}footer{width: 100%; max-width: 800px; margin: 0 auto; color: #333333; border-bottom-left-radius: 5px; border-bottom-right-radius: 5px; text-align: center;}footer p{margin: 0; margin-top: 10px; color: #333333;}.f-inner{padding: 20px;}.socials{padding: 0; margin: 0;}.socials li{display: inline-block; margin: 10px 15px;}footer .socials{display: inline-block; margin: 0 auto; margin-bottom: 15px;}.socials a{color: #646262; font-size: 20px;}@media (max-width: 500px){p{font-size: 15px;}h2{font-size: 20px;}span{font-size: 15px;}.cta a{font-size: 16px;}.socials li{margin-bottom: 0;}.socials a{color: #646262; font-size: 16px;}}</style></head><body> <div class="wrapper"> <div class="img-cont"><img class="logo" src="https://cdn.icnet.dev/web/drgn/assets/img/svg/Dragon.png" alt="logo" width="200px"/></div><div class="text-container"> <div class="inner"> <h2>You are about to change your email address.</h2> <p>In order of completion, you have to verify your email address, you do this by pressing the button below.</p><p>Have fun playing,<br>Your Dragonfly team!</p><br/> <div class="cta"><a href="${PROD_EMAIL_CHANGE_URL}?r=${md5(receiver)}&c=${code}&change=true">Change it!</a></div></div></div><footer> <div class="f-inner"> <ul class="socials"> <li><a href="https://icnet.dev/insta"> Instagram </a></li>&#45; <li><a href="https://icnet.dev/twitter"> Twitter </a></li>&#45; <li><a href="https://icnet.dev/discord"> Discord </a></li></ul> <p>&copy; 2020 Inception Cloud Network</p></div></footer> </div><script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.0/js/all.min.js"></script></body></html>`
+
     const subjectVerifyAccount = "Account creation"
 
     let email = verifyAccount;
@@ -247,6 +317,9 @@ function sendEmail(code, receiver, emailType) {
     if (emailType === "reset") {
       email = passwordReset;
       subject = subjectPasswordReset
+    } else if (emailType === 'change') {
+      email = changeEmail
+      subject = changeEmailSubject
     } else {
       subject = subjectVerifyAccount
     }
@@ -257,7 +330,7 @@ function sendEmail(code, receiver, emailType) {
       from: `"Dragonfly" ${drgnNoreplyEmail.user}`, // sender address
       to: `${receiver}`, // list of receivers
       subject: subject, // Subject line
-      text: `Please verify your account or reset your password. At ${PROD_EMAIL_URL}?r=${md5(receiver)}&c=${code}`,
+      text: `Please verify your account or reset your password at ${PROD_EMAIL_URL}?r=${md5(receiver)}&c=${code}`,
       html: email
 
       // html body
@@ -294,6 +367,26 @@ function validatePassword(pw) {
   } else {
     return false
   }
+}
+
+async function getDragonflyAccount(token) {
+  console.log(token)
+  let account;
+  await axios.post('https://api.playdragonfly.net/v1/authentication/token', {}, {
+    headers: {
+      "Authorization": `Bearer ${token}`
+    }
+  })
+    .then(result => {
+      console.log(result)
+      account = result.data
+    })
+    .catch(err => {
+      if (err) console.log("err")
+    })
+  console.log('account', account)
+
+  return account
 }
 
 module.exports = router;
