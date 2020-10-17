@@ -5,6 +5,10 @@ const AccountSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    uuid: {
+        type: String,
+        required: true
+    },
     name: {
         type: String,
         required: true
@@ -12,7 +16,13 @@ const AccountSchema = new mongoose.Schema({
     password: {
         type: String,
         required: true
-    }
+    },
+    metadata: {
+        emailChangeDate: {
+            type: Number,
+            default: null
+        }
+    },
 })
 
 const Account = mongoose.model('Account', AccountSchema, "accounts");
