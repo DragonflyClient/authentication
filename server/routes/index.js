@@ -142,9 +142,12 @@ router.post('/change', async (req, res) => {
     uuid: dragonflyAccount.uuid,
     email: email,
     code: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
-    expiresAt: Date.now() + 15 * 60000
+    expiresAt: Date.now() + 10 * 60000
   })
-  if (!validateEmail(email)) return res.status(400).send({ message: "Please enter a valid email address" })
+  if (!validateEmail(email)) return res.status(400).send({ success: false, message: "Please enter a valid email address" })
+
+  const account = await Account.findOne({ email: email })
+  if (account) return res.status(400).send({ success: false, message: "This email is already assigned to a Dragonfly account" })
 
   Account.findOne({ uuid: dragonflyAccount.uuid })
     .then(account => {
@@ -157,12 +160,10 @@ router.post('/change', async (req, res) => {
       }
 
       if (account) {
-        if (account.email == email) return res.status(400).send({ message: "An account with this email address has already been created" })
+        if (account.email == email) return res.status(400).send({ success: false, message: "An account with this email address has already been created" })
       }
-
-      Email.findOne({ $or: [{ email: email }, { uuid: dragonflyAccount.uuid }] })
-        .then(async email => {
-          console.log(email)
+      Email.findOne({ uuid: dragonflyAccount.uuid })
+        .then(email => {
           if (email) {
             if (new Date().toISOString() > new Date(email.expiresAt).toISOString() && email.status === "pending") {
               Email.findOneAndDelete({ email: email, status: "pending" })
@@ -171,23 +172,39 @@ router.post('/change', async (req, res) => {
                   res.send(err)
                 })
             } else {
-              return res.status(400).send({ emailStatus: email.status, message: "This email address is either in a verification process or has already been used. If you think this is an error, please contact our support." })
+              return res.status(400).send({ success: false, emailStatus: email.status, message: "An email change has already been started with this account. Finish the verification or try again in a few minutes." })
             }
-          }
-
-          try {
-            console.log(newEmail.code, newEmail.email, "pre-send")
-            await sendEmail(newEmail.code, newEmail.email, "change")
-
-            newEmail.save()
+          } else {
+            Email.findOne({ email: email })
               .then(async email => {
                 console.log(email)
-              })
-              .catch(err => console.log(err))
+                if (email) {
+                  if (new Date().toISOString() > new Date(email.expiresAt).toISOString() && email.status === "pending") {
+                    Email.findOneAndDelete({ email: email, status: "pending" })
+                      .catch(err => {
+                        console.log(err)
+                        res.send(err)
+                      })
+                  } else {
+                    return res.status(400).send({ success: false, emailStatus: email.status, message: "This email address is in a verification process. If you think this is an error, please contact our support." })
+                  }
+                }
 
-            res.status(201).send({ message: "Successfully started verification process. If you have not received an email within the next 10-15 minutes, please try again or contact support." })
-          } catch (error) {
-            res.status(500).send({ message: error.message })
+                try {
+                  console.log(newEmail.code, newEmail.email, "pre-send")
+                  await sendEmail(newEmail.code, newEmail.email, "change")
+
+                  newEmail.save()
+                    .then(async email => {
+                      console.log(email)
+                    })
+                    .catch(err => console.log(err))
+
+                  res.status(201).send({ success: true, message: "Successfully started verification process. If you have not received an email within the next 10-15 minutes, please try again or contact support." })
+                } catch (error) {
+                  res.status(500).send({ success: false, message: error.message })
+                }
+              })
           }
         })
     })
