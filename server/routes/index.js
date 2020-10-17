@@ -146,10 +146,19 @@ router.post('/change', async (req, res) => {
   })
   if (!validateEmail(email)) return res.status(400).send({ message: "Please enter a valid email address" })
 
-  Account.findOne({ email: email })
+  Account.findOne({ uuid: dragonflyAccount.uuid })
     .then(account => {
-      console.log(account)
-      if (account) return res.status(400).send({ message: "An account with this email address has already been created" })
+      const changeDelay = 1000 * 60 * 60 * 24 * 14
+      const currentTime = new Date().getTime()
+      const renameDate = account.metadata.emailChangeDate
+
+      if (currentTime - renameDate < changeDelay) {
+        return res.status(400).send({ success: false, error: "You can only change your email address every 14 days.", next: (renameDate + changeDelay) })
+      }
+
+      if (account) {
+        if (account.email == email) return res.status(400).send({ message: "An account with this email address has already been created" })
+      }
 
       Email.findOne({ $or: [{ email: email }, { uuid: dragonflyAccount.uuid }] })
         .then(async email => {
@@ -188,8 +197,9 @@ router.post('/verify/change/:email/:code', async (req, res) => {
   const { code } = req.params
 
   const result = await Email.findOne({ code: code })
+  const currentTime = new Date().getTime()
 
-  await Account.updateOne({ uuid: result.uuid }, { $set: { email: result.email } })
+  await Account.updateOne({ uuid: result.uuid }, { $set: { email: result.email, "metadata.emailChangeDate": currentTime } })
   await Email.findOneAndDelete({ code: code })
   res.send({ success: true, successId: 78432 })
 })
