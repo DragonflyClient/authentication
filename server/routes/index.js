@@ -29,15 +29,15 @@ router.get('/', function (req, res, next) {
 // Create verification
 router.post('/register', rateLimit({ windowMs: 60 * 1000, max: 7, message: { status: 429, message: 'Too many requests. Please try again later.' } }), async (req, res) => {
 	const email = await req.body.email;
-	const partner = await req.body.partnerRef;
-	console.log(partner);
+	const partner = await req.cookies.partner;
+
 	const newEmail = new Email({
 		email: email,
 		code: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
 		partner: partner,
 		expiresAt: Date.now() + 10 * 60000
 	});
-	console.log(newEmail, 'NEW EMAIL');
+
 	if (!validateEmail(email)) return res.status(400).send({ message: 'Please enter a valid email address' });
 
 	Account.findOne({ email: email }).then(account => {
